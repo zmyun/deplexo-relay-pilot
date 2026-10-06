@@ -1,8 +1,8 @@
 FROM python:3.13-slim
 WORKDIR /app
-COPY proxy.py .
-RUN useradd -m -u 10001 relay && chown relay:relay /app/proxy.py
+COPY relay.py .
+RUN useradd -m -u 10001 relay && chown relay:relay /app/relay.py
 USER relay
 ENV PORT=3000
 EXPOSE 3000
-CMD ["python", "proxy.py"]
+CMD ["python", "relay.py"]

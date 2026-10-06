@@ -26,6 +26,7 @@ import threading
 PORT = int(os.environ.get("PORT", "3000"))
 TOKEN = os.environ.get("PROXY_TOKEN", "")
 VLESS_UUID = os.environ.get("VLESS_UUID", "").lower().replace("-", "")
+SUB_TOKEN = os.environ.get("SUB_TOKEN", "")
 
 
 def ws_accept(key):
@@ -436,6 +437,21 @@ def handle(conn, addr):
 
         if method == "GET" and path == "/health":
             conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok")
+            return
+        if method == "GET" and path.startswith("/sub/"):
+            # token-protected subscription: /sub/<SUB_TOKEN>
+            tok = path[len("/sub/"):].split("?")[0].split("/")[0]
+            if SUB_TOKEN and tok == SUB_TOKEN and VLESS_UUID:
+                host = headers.get("host", "relay-pilot.de.deplexo.com").split(":")[0]
+                u = VLESS_UUID
+                dashed = f"{u[0:8]}-{u[8:12]}-{u[12:16]}-{u[16:20]}-{u[20:32]}" if len(u) == 32 else u
+                sub = (f"vless://{dashed}@{host}:443?encryption=none&security=tls"
+                       f"&type=ws&host={host}&path=%2Fvless#Deplexo-VLESS\n")
+                body = base64.b64encode(sub.encode()).decode()
+                conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
+                            + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body.encode())
+            else:
+                conn.sendall(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             return
         if path in ("/egress", "/ingress", "/ws-echo", "/vless"):
             if path in ("/egress", "/ingress") and not authorized(headers):
